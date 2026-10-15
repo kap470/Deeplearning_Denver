@@ -160,10 +160,10 @@ plt.savefig("../Figures/boxplot_group2.png", dpi=150, bbox_inches="tight")
 plt.show()
 
 ####################
-# Save final cleaned dataset to precip_temp_cleaned.csv
+# Save final cleaned dataset to gw_cleaned.csv
 try: 
-    datafile.to_csv('../data/precip_temp_cleaned.csv', index = False)
+    datafile.to_csv('../data/gw_cleaned.csv', index = False)
 except Exception as e:
-    print('Error saving precip_temp_cleaned.csv')
+    print('Error saving gw_cleaned.csv')
 else: 
-    print(f'precip_temp_cleaned.csv created successfully')
+    print(f'gw_cleaned.csv created successfully')
