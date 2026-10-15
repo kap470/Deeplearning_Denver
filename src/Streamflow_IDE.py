@@ -48,7 +48,7 @@ else:
     
 # Save cleaned data to streamflow_cleaned.csv
 try: 
-    datafile.to_csv(../data/streamflow_cleaned.csv)
+    datafile.to_csv('../data/streamflow_cleaned.csv', index = False)
 except Exception as e:
     print('Error saving streamflow_cleaned.csv')
 else: 
