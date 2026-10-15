@@ -162,7 +162,7 @@ plt.show()
 ####################
 # Save final cleaned dataset to gw_cleaned.csv
 try: 
-    datafile.to_csv('../data/gw_cleaned.csv', index = False)
+    df.to_csv('../data/gw_cleaned.csv', index = False)
 except Exception as e:
     print('Error saving gw_cleaned.csv')
 else: 
