@@ -158,3 +158,12 @@ ax2_table.axis("off")
 plt.tight_layout()
 plt.savefig("../Figures/boxplot_group2.png", dpi=150, bbox_inches="tight")
 plt.show()
+
+####################
+# Save final cleaned dataset to gw_cleaned.csv
+try: 
+    df.to_csv('../data/gw_cleaned.csv', index = False)
+except Exception as e:
+    print('Error saving gw_cleaned.csv')
+else: 
+    print(f'gw_cleaned.csv created successfully')

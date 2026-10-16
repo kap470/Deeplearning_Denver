@@ -362,3 +362,12 @@ plt.tight_layout()
 plt.savefig('../Figures/PRCP_boxplot.png', dpi=300, bbox_inches='tight')
 
 plt.close()
+
+####################
+# Save final cleaned dataset to precip_temp_cleaned.csv
+try: 
+    datafile.to_csv('../data/precip_temp_cleaned.csv', index = False)
+except Exception as e:
+    print('Error saving precip_temp_cleaned.csv')
+else: 
+    print(f'precip_temp_cleaned.csv created successfully')

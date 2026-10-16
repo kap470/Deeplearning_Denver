@@ -45,6 +45,14 @@ except Exception as e:
     print (f'Error creating "month" column: {e}')
 else: 
     print(f'"month" column created successfully')
+    
+# Save cleaned data to streamflow_cleaned.csv
+try: 
+    datafile.to_csv('../data/streamflow_cleaned.csv', index = False)
+except Exception as e:
+    print('Error saving streamflow_cleaned.csv')
+else: 
+    print(f'streamflow_cleaned.csv created successfully')
 
 # Yearly view
 yearly_view=datafile.groupby('year')['value'].sum().reset_index()
