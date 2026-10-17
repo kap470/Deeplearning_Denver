@@ -2,10 +2,10 @@ import pandas as pd
 import numpy as np
 
 # file paths
-wells_file="wells_wide.csv"
-climate_file="Precip_and_Temp.csv"
-streamflow_file="streamflow.csv"
-output_file="input.csv"
+wells_file="../data/wells_wide.csv"
+climate_file="../data/Precip_and_Temp.csv"
+streamflow_file="../data/streamflow.csv"
+output_file="../data/input_model.csv"
 
 # modeling period
 period_start=pd.Timestamp("1994-03-01")

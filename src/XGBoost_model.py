@@ -1,11 +1,4 @@
-#Created by: Fabian Melendez
-#Created On:  13 Mar 2026
-#Course: CSCI 5420 Applied Machine Learning I 
-#Phase 4 
-#Objective:  Begin Implementing model trials with XGBoost, Random Forest, and SVM from scikit learn
-# 
-# 
-
+#Implementing model trials with XGBoost
 # Install standard packages and import packages
 import numpy as np
 import pandas as pd
@@ -20,7 +13,7 @@ from xgboost import XGBRegressor
 
 
 # Load dataset
-df = pd.read_csv("input.csv", parse_dates=["Date"])
+df = pd.read_csv("../data/input_model.csv", parse_dates=["Date"])
 df["Date"] = pd.to_datetime(df["Date"]) #convert date column to datetime object 
 df = df.sort_values("Date") #Sort date values 
 
