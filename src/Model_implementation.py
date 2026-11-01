@@ -38,7 +38,7 @@ def evaluate(y_test, y_pred):
     return {"RMSE": rmse, "R2": r2, "MAE": mae, "Willmott_d": d, "PBIAS": pbias}
 
 # Load input data file 
-df = pd.read_csv('input_model.csv', parse_dates=['Date'])
+df = pd.read_csv('../data/input_model.csv', parse_dates=['Date'])
 df['Date'] = pd.to_datetime(df['Date'])
 df = df.sort_values('Date').reset_index(drop=True)
 
@@ -73,7 +73,8 @@ for well in wells:
     print(f'Processing {well}')
 
     # Model tuning
-    df_well = df.copy()
+    cols = ["Date", well, "Precip_mm", "Temp_C", "Streamflow"]
+    df_well = df[cols].copy()
 
     for lag in range(1, 13):
         df_well[f'GW_lag_{lag}'] = df_well[well].shift(lag)
@@ -135,40 +136,33 @@ best_weights = None
 history = []
 
 def create_dataset(X, y, lookback):
-    X_seq = []
-    y_seq = []
-
-    for i in range(len(X) - lookback):
-        X_seq.append(X[i:i + lookback])
-        y_seq.append(y[i + lookback])
-
-    X_seq = torch.tensor(np.array(X_seq), dtype=torch.float32)
-    y_seq = torch.tensor(np.array(y_seq), dtype=torch.float32)
-
-    return X_seq, y_seq
+    X_seq, y_seq = [], []
+    for i in range(lookback - 1, len(X)):
+        X_seq.append(X[i - lookback + 1:i + 1])
+        y_seq.append(y[i])
+    return (torch.tensor(np.array(X_seq), dtype=torch.float32),
+            torch.tensor(np.array(y_seq), dtype=torch.float32))
 
 # Defines model: LSTM model and fully connected layer
 class lstm_model(nn.Module):
-    def __init__(self):
+    def __init__(self, n_features, hidden_size=50):
         super().__init__()
-        self.lstm = nn.LSTM(input_size= 15, hidden_size=50, num_layers=1, batch_first=True)
-        self.linear = nn.Linear(50, 1)
+        self.lstm = nn.LSTM(input_size=n_features, hidden_size=hidden_size,
+                            num_layers=1, batch_first=True)
+        self.linear = nn.Linear(hidden_size, 1)
 
     def forward(self, x):
         x, _ = self.lstm(x)
-
-        # extracts only the last time step's output
-        x = x[:, -1, :]
-
-        x = self.linear(x)
-        return x
+        return self.linear(x[:, -1, :])
+    
 # Main LSTM loop: 
 
 for well in wells: 
     print(f'Processing {well}')
 
     # Model tuning
-    df_well = df.copy()
+    cols = ["Date", well, "Precip_mm", "Temp_C", "Streamflow"]
+    df_well = df[cols].copy()
 
     for lag in range(1, 13):
         df_well[f'GW_lag_{lag}'] = df_well[well].shift(lag)
@@ -182,12 +176,18 @@ for well in wells:
 
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, shuffle=False)
     
+    # Scale features (fit on train only)
     scaler = StandardScaler()
     X_train_std = scaler.fit_transform(X_train)
     X_test_std = scaler.transform(X_test)
 
-    X_train_seq, y_train_seq = create_dataset(X_train_std, y_train, lookback)
-    X_test_seq, y_test_seq = create_dataset(X_test_std, y_test, lookback)
+    # Scale target (fit on train only)
+    y_scaler = StandardScaler()
+    y_train_std = y_scaler.fit_transform(y_train.reshape(-1, 1)).ravel()
+    y_test_std = y_scaler.transform(y_test.reshape(-1, 1)).ravel()
+
+    X_train_seq, y_train_seq = create_dataset(X_train_std, y_train_std, lookback)
+    X_test_seq, y_test_seq = create_dataset(X_test_std, y_test_std, lookback)
 
     print(f'For {well} : ')
     print('X_train shape:', X_train_seq.shape)
@@ -198,39 +198,41 @@ for well in wells:
     # ChatGPT used here to help add lookback to previous flow for compatibility, while adding benefits of LSTM 
     #   for time sequence modeling, lag kept despite lookback for performance comparisons
 
-    model = lstm_model()
+    y_test_orig = y_test[lookback - 1:]   # observed values in ft, aligned with sequences
+
+    torch.manual_seed(1)
+    model = lstm_model(n_features=len(feature_cols))
     optimizer = optim.Adam(model.parameters())
     loss_fn = nn.MSELoss()
-    loader = data.DataLoader(data.TensorDataset(X_train_seq, y_train_seq), shuffle=True, batch_size = 8)
+    loader = data.DataLoader(data.TensorDataset(X_train_seq, y_train_seq),
+                             shuffle=True, batch_size=8)
 
     for epoch in range(n_epochs):
         model.train()
         for X_batch, y_batch in loader:
             y_pred = model(X_batch)
-            y_batch = y_batch.unsqueeze(1)
-            loss = loss_fn(y_pred, y_batch)
+            loss = loss_fn(y_pred, y_batch.unsqueeze(1))
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
 
-        model.eval()
-        with torch.no_grad():
-            start = time.time()
-            y_pred_lstm = model(X_test_seq).cpu().numpy()
-            time_test_lstm = time.time()-start
+    model.eval()
+    with torch.no_grad():
+        start = time.time()
+        y_pred_std = model(X_test_seq).cpu().numpy()
+        time_test_lstm = time.time() - start
 
-        # Calculate error metrics    
-        metrics_lstm = evaluate(y_test_seq, y_pred_lstm)
+    # Back to original units (ft)
+    y_pred_lstm = y_scaler.inverse_transform(y_pred_std).ravel()
 
-        # Store tuned results
-        for model_name, metrics, test_time in [("LSTM", metrics_lstm, time_test_lstm)]:
-            row = {"Well": well, 'Model': model_name}
-            row.update(metrics)
-            row['Test_Time_s'] = round(test_time, 6)
-            results.append(row)
+    metrics_lstm = evaluate(y_test_orig, y_pred_lstm)
 
-        # Save arrays for time series plotting
-        time_series_store[well].update({'y_pred_lstm':y_pred_lstm})
+    row = {"Well": well, "Model": "LSTM"}
+    row.update(metrics_lstm)
+    row["Test_Time_s"] = round(time_test_lstm, 6)
+    results.append(row)
+
+    time_series_store[well]["y_pred_lstm"] = y_pred_lstm
         
 #Figure 1 - Time series plots
 fig1, axes1 = plt.subplots(7, 1, figsize=(16, 22), sharex=False)
@@ -241,7 +243,7 @@ for i, well in enumerate(wells):
 
     ax.plot(ts["test_dates"], ts["y_actual"], color="black", linewidth=2.5, label="Measured",zorder=5)
     ax.plot(ts["test_dates"], ts["y_pred_xgb"], color="steelblue", linewidth=1.8, label="XGBoost",linestyle="dashdot")
-    ax.plot(ts['test_dates'][lookback:], ts['y_pred_lstm'], color = 'orangered', linewidth=1.8, label='LSTM', linestyle = 'dotted' )
+    ax.plot(ts['test_dates'][lookback-1:], ts['y_pred_lstm'], color = 'orangered', linewidth=1.8, label='LSTM', linestyle = 'dotted' )
 
     ax.set_title(well, fontsize=16, fontweight="bold", loc="left")
     ax.set_ylabel("GW Level (ft)", fontsize=16)
@@ -253,6 +255,7 @@ for i, well in enumerate(wells):
 
 axes1[-1].set_xlabel("Date", fontsize=16)
 plt.tight_layout()
+fig1.savefig("../outputs/fig1_timeseries.png", dpi=300, bbox_inches="tight")
 plt.show()
 results_df = pd.DataFrame(results)
 results_df
@@ -283,10 +286,9 @@ fig2.patch.set_facecolor("white")
 for ax, metric in zip(axes2, metrics_list):
     ax.set_facecolor("white")
 
-    vals = [results_df[results_df["Well"] == w][metric].values[0]      for w in wells]
-
-    ax.bar(x - width, vals, width, label="XGBoost",color=model_colors["XGBoost"],edgecolor="none")
-    ax.bar(x - width, vals, width, label="LSTM",color=model_colors["LSTM"],edgecolor="none")
+    for k, (name, color) in enumerate(model_colors.items()):
+        vals = [results_df[(results_df.Well == w) & (results_df.Model == name)][metric].iloc[0] for w in wells]
+        ax.bar(x + (k - 0.5) * width, vals, width, label=name, color=color, edgecolor="none")
 
     ax.set_ylabel(metric_labels[metric], color="black", fontsize=16)
     ax.set_xticks(x)
@@ -303,10 +305,11 @@ for ax, metric in zip(axes2, metrics_list):
         ax.axhline(0, color="black", linewidth=0.8, linestyle="--", alpha=0.5)
 
 plt.tight_layout()
+fig2.savefig("../outputs/fig2_metrics.png", dpi=300, bbox_inches="tight")
 plt.show()
 
 #summary table
 results_df = results_df.round({"RMSE": 3, "R2": 3, "MAE": 3, "Willmott_d": 3, "PBIAS": 2, "Test_Time_s": 6})
-results_df.to_csv("phase5_results_summary.csv", index=False)
+results_df.to_csv("../outputs/phase5_results_summary.csv", index=False)
 
 # ChatGPT used for debugging tensor shape issues

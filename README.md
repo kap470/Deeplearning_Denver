@@ -20,3 +20,8 @@ but also to remove wells with more thatn 40% of missing data.
 -preprocess_input.py to generate the file ../data/input_model.csv that contains uniform input series to train the 
 Machine Learning and Deep Learning models.
 ```
+## Run models
+```
+In the folder .src run:
+-Model_implementation.py to run the XGBoost and the LSTM models. This generates the files phase5_results_summary.csv, and the plots fig1_timeseries.png and fig2_metrics.png 
+```
