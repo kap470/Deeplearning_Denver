@@ -23,5 +23,7 @@ Machine Learning and Deep Learning models.
 ## Run models
 ```
 In the folder .src run:
--Model_implementation.py to run the XGBoost and the LSTM models. This generates the files phase5_results_summary.csv, and the plots fig1_timeseries.png and fig2_metrics.png 
+-stage6_implementation.py to run the XGBoost and the LSTM models. 
+This version performs hyperparameter tuning for both XGBoost and LSTM models.
+This generates the files phase6_results_summary.csv, and the plots fig1_timeseries.png and fig2_metrics.png 
 ```
